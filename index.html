@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RPI — Research → Plan → Implement</title>
+<style>
+  :root {
+    --bg: #0a0b0d;
+    --bg-1: #101216;
+    --bg-2: #161a20;
+    --bg-3: #1d222a;
+    --line: rgba(255, 255, 255, 0.09);
+    --line-strong: rgba(255, 255, 255, 0.18);
+    --ink: #f3f5f7;
+    --ink-dim: #aeb4bd;
+    --ink-mute: #6a7079;
+    --accent: oklch(0.82 0.13 216);
+    --accent-dim: oklch(0.82 0.13 216 / 0.14);
+    --accent-line: oklch(0.82 0.13 216 / 0.4);
+    --green: oklch(0.78 0.16 152);
+    --amber: oklch(0.82 0.15 80);
+    --red: oklch(0.66 0.2 26);
+    --sans: "Helvetica Neue", Helvetica, "Segoe UI", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --maxw: 1140px;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 18px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  ::selection { background: var(--accent); color: #04161b; }
+
+  /* ----- progress + nav rail ----- */
+  #progress {
+    position: fixed;
+    top: 0; left: 0; height: 2px;
+    width: 0%;
+    background: var(--accent);
+    z-index: 60;
+    box-shadow: 0 0 12px var(--accent);
+  }
+
+  #rail {
+    position: fixed;
+    right: 26px; top: 50%;
+    transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 14px;
+    z-index: 55;
+  }
+  .rail-dot {
+    width: 10px; height: 10px; padding: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--line-strong);
+    background: transparent;
+    cursor: pointer;
+    transition: border-color .25s, background .25s, transform .25s;
+  }
+  .rail-dot:hover { border-color: var(--ink-dim); transform: scale(1.25); }
+  .rail-dot[aria-current="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+  }
+  @media (max-width: 760px) { #rail { display: none; } }
+
+  /* ----- layout primitives ----- */
+  section {
+    position: relative;
+    padding: 120px 32px;
+    max-width: var(--maxw);
+    margin: 0 auto;
+  }
+  @media (max-width: 760px) { section { padding: 84px 20px; } }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    display: flex; align-items: center; gap: 12px;
+    margin: 0 0 28px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 28px; height: 1px;
+    background: var(--accent);
+  }
+  .eyebrow .n { color: var(--accent); }
+
+  h2.title {
+    font-size: clamp(2.1rem, 4.4vw, 3.4rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+    margin: 0 0 22px;
+    text-wrap: balance;
+  }
+  .lede {
+    font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+    color: var(--ink-dim);
+    max-width: 720px;
+    margin: 0 0 8px;
+    text-wrap: pretty;
+  }
+
+  /* reveal on scroll */
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+
+  /* ============ HERO ============ */
+  #hero {
+    min-height: 100vh;
+    max-width: none;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 96px 32px 64px;
+    background:
+      radial-gradient(620px 420px at 18% 8%, oklch(0.82 0.13 216 / 0.10), transparent 70%),
+      radial-gradient(60% 60% at 100% 100%, rgba(255,255,255,0.03), transparent);
+  }
+  #hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: radial-gradient(80% 70% at 30% 30%, #000 0%, transparent 75%);
+            mask-image: radial-gradient(80% 70% at 30% 30%, #000 0%, transparent 75%);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .hero-inner { max-width: var(--maxw); margin: 0 auto; width: 100%; position: relative; z-index: 2; }
+  .prompt {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    letter-spacing: 0.18em;
+    color: var(--ink-mute);
+    margin: 0 0 30px;
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  .prompt .live {
+    color: var(--accent);
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .blip {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 var(--accent);
+    animation: pulse 2.2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 oklch(0.82 0.13 216 / 0.6); }
+    70% { box-shadow: 0 0 0 12px oklch(0.82 0.13 216 / 0); }
+    100% { box-shadow: 0 0 0 0 oklch(0.82 0.13 216 / 0); }
+  }
+  h1.hero-h {
+    font-size: clamp(2.6rem, 7vw, 6rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 0.98;
+    margin: 0 0 32px;
+    max-width: 16ch;
+    text-wrap: balance;
+  }
+  h1.hero-h .flow { white-space: nowrap; }
+  h1.hero-h .arr { color: var(--accent); font-weight: 400; }
+  h1.hero-h .accent-word { color: var(--accent); }
+  .hero-sub {
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+    color: var(--ink-dim);
+    max-width: 40ch;
+    margin: 0 0 8px;
+    line-height: 1.4;
+  }
+  .hero-sub b { color: var(--ink); font-weight: 700; }
+  .cue {
+    margin-top: 56px;
+    display: inline-flex; align-items: center; gap: 14px;
+    background: none; border: 0; cursor: pointer;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
+    padding: 0;
+  }
+  .cue .ring {
+    width: 46px; height: 46px; border-radius: 50%;
+    border: 1.5px solid var(--accent-line);
+    display: grid; place-items: center;
+    color: var(--accent);
+    transition: background .25s, transform .25s;
+  }
+  .cue:hover .ring { background: var(--accent-dim); transform: translateY(3px); }
+  .cue .ring svg { animation: bob 1.8s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(-2px); } 50% { transform: translateY(3px); } }
+  @media (prefers-reduced-motion: reduce) {
+    .blip, .cue .ring svg { animation: none; }
+  }
+
+  /* ============ PIPELINE ============ */
+  .pipe {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+    align-items: stretch;
+    gap: 0;
+    margin: 40px 0 0;
+  }
+  .node {
+    text-align: left;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px 18px;
+    cursor: pointer;
+    color: var(--ink);
+    font-family: inherit;
+    transition: border-color .25s, background .25s, transform .2s;
+    display: flex; flex-direction: column; gap: 10px;
+    min-height: 132px;
+  }
+  .node:hover { border-color: var(--line-strong); transform: translateY(-3px); }
+  .node:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .node[aria-expanded="true"] {
+    border-color: var(--accent-line);
+    background: linear-gradient(180deg, var(--accent-dim), var(--bg-1));
+    box-shadow: 0 0 0 1px var(--accent-line), 0 18px 40px -28px var(--accent);
+  }
+  .node .nidx { font-family: var(--mono); font-size: 0.72rem; color: var(--ink-mute); letter-spacing: 0.15em; }
+  .node[aria-expanded="true"] .nidx { color: var(--accent); }
+  .node .ncmd { font-family: var(--mono); font-size: 1.18rem; font-weight: 700; letter-spacing: -0.01em; }
+  .node .njob { font-size: 0.92rem; color: var(--ink-dim); line-height: 1.35; }
+  .node .ntag {
+    margin-top: auto;
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: .1em;
+    color: var(--ink-mute); text-transform: uppercase;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .node[aria-expanded="true"] .ntag { color: var(--accent); }
+  .node .chev { width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform .25s; }
+  .node[aria-expanded="true"] .chev { transform: rotate(-135deg); }
+
+  .conn {
+    position: relative;
+    width: 56px;
+    align-self: center;
+    height: 2px;
+  }
+  .conn .track { position: absolute; top: 50%; left: 0; right: 0; height: 2px; transform: translateY(-50%); background: var(--line-strong); }
+  .conn .head { position: absolute; top: 50%; right: -1px; transform: translateY(-50%); width: 7px; height: 7px; border-right: 2px solid var(--line-strong); border-top: 2px solid var(--line-strong); rotate: 45deg; }
+  .conn .tok {
+    position: absolute; top: 50%; left: 0;
+    width: 9px; height: 11px; border-radius: 2px;
+    background: var(--accent);
+    transform: translate(-2px, -50%);
+    box-shadow: 0 0 10px var(--accent);
+    animation: travel 2.6s cubic-bezier(.6,0,.4,1) infinite;
+    opacity: 0;
+  }
+  .conn .doclabel {
+    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 0.62rem; color: var(--ink-mute);
+    white-space: nowrap; letter-spacing: .02em;
+  }
+  @keyframes travel {
+    0% { left: 0; opacity: 0; }
+    12% { opacity: 1; }
+    88% { opacity: 1; }
+    100% { left: 100%; opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .conn .tok { animation: none; opacity: 0; } }
+
+  .drawer {
+    margin-top: 22px;
+    border: 1px solid var(--accent-line);
+    border-radius: 16px;
+    background: linear-gradient(180deg, var(--bg-1), var(--bg));
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows .4s cubic-bezier(.2,.7,.2,1), opacity .35s, margin-top .35s;
+    opacity: 0;
+  }
+  .drawer.open { grid-template-rows: 1fr; opacity: 1; }
+  .drawer-clip { overflow: hidden; }
+  .drawer-pad { padding: 26px 28px; }
+  .drawer-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; align-items: start; }
+  @media (max-width: 760px) { .drawer-grid { grid-template-columns: 1fr; gap: 22px; } }
+  .drawer h3 { font-family: var(--mono); font-size: 1.4rem; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .drawer .role { font-family: var(--mono); font-size: 0.72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); margin: 0 0 16px; }
+  .drawer p { color: var(--ink-dim); margin: 0 0 18px; max-width: 46ch; }
+  .artifact {
+    font-family: var(--mono); font-size: 0.86rem;
+    background: var(--bg-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px;
+    color: var(--ink);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .artifact .alab { font-size: 0.66rem; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-mute); }
+  .artifact .afile { color: var(--accent); }
+  .artifact .afile .pen { color: var(--ink-dim); }
+
+  .copychip {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 0.95rem;
+    background: var(--bg-2);
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    padding: 11px 16px 11px 18px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  .copychip:hover { border-color: var(--accent-line); background: var(--bg-3); }
+  .copychip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copychip .cmd { color: var(--accent); }
+  .copychip .ico { display: inline-flex; color: var(--ink-mute); }
+  .copychip.copied { border-color: var(--green); }
+  .copychip.copied .ico { color: var(--green); }
+  .copychip .copied-txt { display: none; color: var(--green); font-size: 0.78rem; letter-spacing: .08em; }
+  .copychip.copied .copied-txt { display: inline; }
+
+  .caption {
+    margin-top: 30px;
+    font-size: 1.05rem; color: var(--ink-dim);
+    max-width: 760px; text-wrap: pretty;
+  }
+  .caption b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 760px) {
+    .pipe { grid-template-columns: 1fr; gap: 0; }
+    .conn { width: 2px; height: 38px; justify-self: center; margin: 4px 0; }
+    .conn .track { left: 50%; top: 0; bottom: 0; right: auto; width: 2px; height: auto; transform: translateX(-50%); }
+    .conn .head { top: auto; bottom: -1px; right: 50%; transform: translateX(50%); rotate: 135deg; }
+    .conn .tok { animation: travelv 2.6s cubic-bezier(.6,0,.4,1) infinite; left: 50%; transform: translate(-50%, 0); }
+    .conn .doclabel { bottom: auto; top: 50%; left: 14px; transform: translateY(-50%); }
+    @keyframes travelv { 0%{top:0;opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{top:100%;opacity:0} }
+  }
+
+  /* ============ SMART ZONE ============ */
+  .meter-wrap { margin-top: 44px; display: grid; grid-template-columns: 1fr; gap: 0; }
+  .meter-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; }
+  .meter-zone { font-family: var(--mono); font-size: 0.78rem; letter-spacing: .16em; text-transform: uppercase; }
+  .meter-zone.left { color: var(--green); }
+  .meter-zone.right { color: var(--red); }
+  .meter {
+    position: relative;
+    height: 64px;
+    border-radius: 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    overflow: hidden;
+    cursor: ew-resize;
+    touch-action: none;
+  }
+  .meter .ticks { position: absolute; inset: 0; pointer-events: none; opacity: .5; }
+  .meter .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+  .meter .fill {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    width: 28%;
+    background: var(--green);
+    transition: background .12s linear;
+  }
+  .meter .fill::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12));
+  }
+  .meter .handle {
+    position: absolute; top: -6px; bottom: -6px; left: 28%;
+    width: 4px; transform: translateX(-50%);
+    background: var(--ink);
+    border-radius: 4px;
+    box-shadow: 0 0 0 4px var(--bg), 0 0 18px rgba(0,0,0,0.6);
+  }
+  .meter .handle::after {
+    content: "⇆";
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--ink); color: var(--bg);
+    display: grid; place-items: center;
+    font-size: 14px;
+  }
+  .meter:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .meter .pct {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    right: 18px;
+    font-family: var(--mono); font-weight: 700; font-size: 1.5rem;
+    color: var(--ink); text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+  .meter-foot { display: flex; justify-content: space-between; margin-top: 10px; font-family: var(--mono); font-size: 0.72rem; color: var(--ink-mute); }
+
+  .zone-status {
+    margin-top: 30px;
+    border-left: 2px solid var(--zonecol, var(--green));
+    padding: 4px 0 4px 20px;
+    transition: border-color .2s;
+  }
+  .zone-status .zs-tag {
+    font-family: var(--mono); font-size: 0.78rem; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--zonecol, var(--green)); margin: 0 0 8px; transition: color .2s;
+  }
+  .zone-status p { margin: 0; color: var(--ink-dim); font-size: 1.06rem; max-width: 60ch; }
+  .zone-status p b { color: var(--ink); }
+  .tiein {
+    margin-top: 32px; padding: 22px 24px;
+    background: var(--bg-1); border: 1px solid var(--line);
+    border-radius: 14px;
+    display: flex; gap: 16px; align-items: flex-start;
+    max-width: 760px;
+  }
+  .tiein .badge { font-family: var(--mono); color: var(--accent); font-size: 0.8rem; letter-spacing: .1em; white-space: nowrap; padding-top: 2px; }
+  .tiein p { margin: 0; color: var(--ink-dim); }
+  .tiein b { color: var(--ink); font-weight: 600; }
+
+  /* ============ UNLOCK ============ */
+  .toggle {
+    display: inline-flex; padding: 5px; gap: 4px;
+    background: var(--bg-2); border: 1px solid var(--line);
+    border-radius: 999px; margin: 36px 0 26px;
+  }
+  .toggle button {
+    font-family: var(--mono); font-size: 0.92rem;
+    background: none; border: 0; color: var(--ink-dim);
+    padding: 10px 22px; border-radius: 999px; cursor: pointer;
+    transition: background .2s, color .2s;
+  }
+  .toggle button[aria-pressed="true"] { background: var(--accent); color: #04161b; font-weight: 700; }
+  .toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .stage {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--bg-1);
+    overflow: hidden;
+  }
+  .stage-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: 0.78rem; color: var(--ink-mute);
+    background: var(--bg-2);
+  }
+  .stage-bar .meta { display: flex; align-items: center; gap: 14px; }
+  .counter { font-weight: 700; }
+  .counter.add { color: var(--green); }
+  .counter.plan { color: var(--accent); }
+  .panebox { position: relative; height: 440px; }
+  .pane { position: absolute; inset: 0; overflow: auto; opacity: 0; pointer-events: none; transition: opacity .3s; }
+  .pane.show { opacity: 1; pointer-events: auto; }
+  .pane::-webkit-scrollbar { width: 10px; }
+  .pane::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 6px; }
+
+  .codeline { display: grid; grid-template-columns: 48px 16px 1fr; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; }
+  .codeline .ln { color: var(--ink-mute); text-align: right; padding-right: 12px; user-select: none; }
+  .diff .codeline { background: oklch(0.78 0.16 152 / 0.06); }
+  .diff .codeline .sign { color: var(--green); }
+  .diff .codeline .src { color: oklch(0.86 0.08 152); white-space: pre; }
+  .diff-inner { padding: 8px 14px; }
+  .plan-inner { padding: 18px 22px; }
+  .plan .codeline { grid-template-columns: 40px 1fr; background: transparent; }
+  .plan .codeline .ln { padding-right: 14px; }
+  .plan .src { white-space: pre-wrap; color: var(--ink-dim); }
+  .plan .src.h { color: var(--ink); font-weight: 700; }
+  .plan .src.acc { color: var(--accent); }
+  .plan .src.no { color: var(--red); }
+  .plan .src.ok { color: var(--green); }
+  .plan .src.dim { color: var(--ink-mute); }
+
+  .unlock-callout {
+    margin-top: 30px;
+    display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center;
+    background: linear-gradient(110deg, var(--accent-dim), transparent 70%);
+    border: 1px solid var(--accent-line);
+    border-radius: 16px; padding: 24px 28px;
+  }
+  .unlock-callout .pr { font-family: var(--mono); font-weight: 800; font-size: 1.5rem; color: var(--accent); white-space: nowrap; }
+  .unlock-callout p { margin: 0; color: var(--ink); font-size: 1.05rem; max-width: 70ch; text-wrap: pretty; }
+  .unlock-callout p .num { color: var(--accent); font-weight: 700; }
+  @media (max-width: 620px){ .unlock-callout { grid-template-columns: 1fr; gap: 12px; } }
+
+  /* ============ PROOF ============ */
+  .case {
+    margin-top: 38px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--bg-1);
+    overflow: hidden;
+  }
+  .case-top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 26px; border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: 0.8rem; color: var(--ink-mute);
+  }
+  .case-steps { display: flex; gap: 8px; }
+  .stepdot { display: flex; align-items: center; gap: 8px; }
+  .stepdot .b { width: 9px; height: 9px; border-radius: 50%; background: var(--bg-3); border: 1px solid var(--line-strong); transition: background .25s, border-color .25s; }
+  .stepdot[data-on="true"] .b { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .stepdot[data-done="true"] .b { background: var(--ink-mute); border-color: var(--ink-mute); box-shadow: none; }
+
+  .case-body { padding: 40px 40px 30px; min-height: 360px; position: relative; }
+  @media (max-width: 760px){ .case-body { padding: 28px 22px; } }
+  .step { display: none; animation: fadeStep .45s cubic-bezier(.2,.7,.2,1); }
+  .step.active { display: block; }
+  @keyframes fadeStep { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce){ .step.active { animation: none; } }
+  .step .srole {
+    font-family: var(--mono); font-size: 0.76rem; letter-spacing: .2em; text-transform: uppercase;
+    display: inline-flex; align-items: center; gap: 10px;
+    color: var(--accent); margin: 0 0 18px;
+  }
+  .step .srole .sn { color: var(--ink-mute); }
+  .step h3 { font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 18px; line-height: 1.08; max-width: 22ch; }
+  .step p { color: var(--ink-dim); font-size: 1.1rem; max-width: 64ch; margin: 0 0 16px; text-wrap: pretty; }
+  .step p b { color: var(--ink); font-weight: 600; }
+  .step .kill { color: var(--red); font-weight: 700; }
+
+  .statrow { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 26px; }
+  .stat {
+    background: var(--bg-2); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px 20px; min-width: 150px;
+  }
+  .stat .v { font-family: var(--mono); font-weight: 800; font-size: 1.7rem; color: var(--accent); letter-spacing: -0.02em; }
+  .stat .v.bad { color: var(--red); }
+  .stat .k { font-size: 0.8rem; color: var(--ink-mute); margin-top: 4px; }
+
+  .notlist { display: grid; gap: 10px; margin-top: 22px; max-width: 70ch; }
+  .notitem { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: baseline; padding: 14px 16px; background: var(--bg-2); border: 1px solid var(--line); border-left: 2px solid var(--red); border-radius: 10px; }
+  .notitem .x { color: var(--red); font-family: var(--mono); font-weight: 700; }
+  .notitem .t { color: var(--ink-dim); }
+  .notitem .t b { color: var(--ink); }
+
+  .case-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 26px; border-top: 1px solid var(--line); background: var(--bg-2);
+  }
+  .case-nav .pos { font-family: var(--mono); font-size: 0.82rem; color: var(--ink-mute); }
+  .navbtns { display: flex; gap: 10px; }
+  .nbtn {
+    font-family: var(--mono); font-size: 0.9rem;
+    background: var(--bg-3); border: 1px solid var(--line-strong);
+    color: var(--ink); border-radius: 999px; padding: 10px 20px; cursor: pointer;
+    transition: background .2s, border-color .2s, opacity .2s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .nbtn:hover:not(:disabled) { border-color: var(--accent-line); background: var(--bg-1); }
+  .nbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .nbtn.primary { background: var(--accent); color: #04161b; border-color: var(--accent); font-weight: 700; }
+  .nbtn:disabled { opacity: .35; cursor: not-allowed; }
+
+  .punch { display: none; }
+  .punch.active { display: block; text-align: center; padding: 30px 10px 6px; animation: fadeStep .5s; }
+  .punch .pk { font-family: var(--mono); font-size: 0.78rem; letter-spacing: .22em; text-transform: uppercase; color: var(--accent); margin-bottom: 20px; }
+  .punch .pbig { font-size: clamp(1.8rem, 4.4vw, 3.2rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; max-width: 18ch; margin: 0 auto; text-wrap: balance; }
+  .punch .pbig .a { color: var(--accent); }
+
+  /* ============ RUN IT ============ */
+  #run { text-align: left; }
+  .runchips { display: flex; flex-wrap: wrap; gap: 16px; margin: 40px 0 28px; }
+  .bigchip {
+    flex: 1 1 280px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    font-family: var(--mono);
+    background: var(--bg-1); border: 1px solid var(--line-strong);
+    border-radius: 16px; padding: 26px 26px; cursor: pointer; color: var(--ink);
+    transition: border-color .2s, background .2s, transform .2s;
+    text-align: left;
+  }
+  .bigchip:hover { border-color: var(--accent-line); background: var(--bg-2); transform: translateY(-3px); }
+  .bigchip:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .bigchip .bc-cmd { font-size: 1.5rem; font-weight: 700; color: var(--accent); letter-spacing: -0.01em; }
+  .bigchip .bc-step { font-size: 0.72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 8px; }
+  .bigchip .bc-ico { color: var(--ink-mute); transition: color .2s; }
+  .bigchip:hover .bc-ico { color: var(--accent); }
+  .bigchip.copied { border-color: var(--green); }
+  .bigchip.copied .bc-ico { color: var(--green); }
+  .bigchip .bc-copied { display: none; font-size: 0.7rem; letter-spacing: .12em; color: var(--green); }
+  .bigchip.copied .bc-copied { display: block; }
+
+  .rightsize { font-size: 1.2rem; color: var(--ink); max-width: 60ch; margin: 0 0 12px; }
+  .rightsize b { color: var(--accent); }
+  .credit { font-family: var(--mono); font-size: 0.78rem; color: var(--ink-mute); margin-top: 48px; letter-spacing: .02em; }
+  .footrule { height: 1px; background: var(--line); max-width: var(--maxw); margin: 0 auto; }
+
+  .kbd-hint {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 0.72rem; color: var(--ink-mute);
+    background: rgba(10,11,13,0.8); border: 1px solid var(--line);
+    padding: 7px 14px; border-radius: 999px; z-index: 40;
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    transition: opacity .4s;
+  }
+  .kbd-hint kbd { color: var(--ink-dim); background: var(--bg-3); border-radius: 4px; padding: 1px 6px; border: 1px solid var(--line-strong); }
+  @media (max-width: 760px){ .kbd-hint { display: none; } }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<nav id="rail" aria-label="Section navigation"></nav>
+
+<!-- ============ HERO ============ -->
+<section id="hero" data-screen-label="01 Hero" data-rail="Intro">
+  <div class="hero-inner">
+    <p class="prompt reveal">RPI&nbsp;//&nbsp;Research · Plan · Implement <span class="live"><span class="blip"></span>live in main</span></p>
+    <h1 class="hero-h reveal">
+      <span class="flow"><span class="accent-word">Research</span> <span class="arr">→</span> <span class="accent-word">Plan</span> <span class="arr">→</span> <span class="accent-word">Implement</span></span> is live in our codebase.
+    </h1>
+    <p class="hero-sub reveal">Not a proposal. Real commands. <b>It already fixed a year-old production bug this week.</b></p>
+    <button class="cue reveal" id="cueBtn" aria-label="Explore the pipeline">
+      Explore the pipeline
+      <span class="ring"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v11M3.5 8.5 8 13l4.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    </button>
+  </div>
+</section>
+
+<!-- ============ PIPELINE ============ -->
+<section id="pipeline" data-screen-label="02 Pipeline" data-rail="Pipeline">
+  <p class="eyebrow reveal"><span class="n">02</span> The pipeline</p>
+  <h2 class="title reveal">Four commands. One clean handoff.</h2>
+  <p class="lede reveal">Click any phase. Each one does a small job, writes one reviewable doc, and hands it to the next.</p>
+
+  <div class="pipe reveal" id="pipe"></div>
+
+  <div class="drawer" id="drawer" aria-live="polite">
+    <div class="drawer-clip"><div class="drawer-pad" id="drawerBody"></div></div>
+  </div>
+
+  <p class="caption reveal">Each phase writes a small, reviewable doc. The next phase reads it. <b>Your context stays in the smart zone.</b></p>
+</section>
+
+<!-- ============ SMART ZONE ============ -->
+<section id="smartzone" data-screen-label="03 Smart Zone" data-rail="Smart zone">
+  <p class="eyebrow reveal"><span class="n">03</span> The smart zone</p>
+  <h2 class="title reveal">An agent is only as good as its context.</h2>
+  <p class="lede reveal">Drag the meter. Watch what happens when the context window fills up with junk.</p>
+
+  <div class="meter-wrap reveal">
+    <div class="meter-head">
+      <span class="meter-zone left">smart zone</span>
+      <span class="meter-zone right">dumb zone</span>
+    </div>
+    <div class="meter" id="meter" tabindex="0" role="slider" aria-label="Context window fill" aria-valuemin="0" aria-valuemax="100" aria-valuenow="28">
+      <div class="ticks" id="ticks"></div>
+      <div class="fill" id="fill"></div>
+      <div class="handle" id="handle"></div>
+      <div class="pct" id="pct">28%</div>
+    </div>
+    <div class="meter-foot"><span>empty context</span><span>context window full</span></div>
+  </div>
+
+  <div class="zone-status" id="zoneStatus">
+    <p class="zs-tag" id="zsTag">smart zone</p>
+    <p id="zsBody"><b>An agent only knows what's in its context window.</b> Fill it with junk and even a capable model makes careless mistakes.</p>
+  </div>
+
+  <div class="tiein reveal">
+    <span class="badge">RPI →</span>
+    <p>Forking the reading out to sub-agents and writing each phase to a file is how RPI <b>keeps the meter low.</b> The main loop holds the plan, not the whole repo.</p>
+  </div>
+</section>
+
+<!-- ============ UNLOCK ============ -->
+<section id="unlock" data-screen-label="04 The Unlock" data-rail="The unlock">
+  <p class="eyebrow reveal"><span class="n">04</span> The unlock</p>
+  <h2 class="title reveal">Review the plan, not the diff.</h2>
+  <p class="lede reveal">Same change, two ways to review it. One is a wall. One you can actually reason about.</p>
+
+  <div class="reveal">
+    <div class="toggle" role="group" aria-label="Review mode">
+      <button id="tDiff" aria-pressed="true">Review the diff</button>
+      <button id="tPlan" aria-pressed="false">Review the plan</button>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="meta"><span id="stageName">feature/email-throttle.diff</span></span>
+        <span class="meta"><span class="counter add" id="stageCount">+2,000  −0</span></span>
+      </div>
+      <div class="panebox">
+        <div class="pane diff show" id="paneDiff"><div class="diff-inner" id="diffInner"></div></div>
+        <div class="pane plan" id="panePlan"><div class="plan-inner" id="planInner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="caption reveal">A bad line of code is one bad line. <b>A bad assumption in a plan becomes hundreds.</b> Review the plan, not the diff.</p>
+
+  <div class="unlock-callout reveal">
+    <span class="pr">PR&nbsp;#14326</span>
+    <p>The plan claimed <span class="num">four</span> handlers set the cache key. A reviewer checked. Only <span class="num">two</span> did. Caught in the plan, before a line of it shipped.</p>
+  </div>
+</section>
+
+<!-- ============ PROOF ============ -->
+<section id="proof" data-screen-label="05 The Proof" data-rail="The proof">
+  <p class="eyebrow reveal"><span class="n">05</span> The proof</p>
+  <h2 class="title reveal">It already cracked GOV-4078.</h2>
+  <p class="lede reveal">A real incident, start to finish. Step through what the loop actually did.</p>
+
+  <div class="case reveal">
+    <div class="case-top">
+      <span>GOV-4078 · OppSource email job · QueryCanceled</span>
+      <div class="case-steps" id="caseSteps"></div>
+    </div>
+    <div class="case-body" id="caseBody"></div>
+    <div class="case-nav">
+      <span class="pos" id="casePos">Step 1 / 4</span>
+      <div class="navbtns">
+        <button class="nbtn" id="prevStep" disabled>← Back</button>
+        <button class="nbtn primary" id="nextStep">Next →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RUN IT ============ -->
+<section id="run" data-screen-label="06 Run It Today" data-rail="Run it today">
+  <p class="eyebrow reveal"><span class="n">06</span> Run it today</p>
+  <h2 class="title reveal">Your next non-trivial task starts here.</h2>
+  <p class="lede reveal">Three commands. Copy one and point it at something hard. Stop one-shotting it.</p>
+
+  <div class="runchips reveal" id="runChips"></div>
+
+  <p class="rightsize reveal">Trivial task? <b>Just talk to the agent.</b> Right-size it.</p>
+  <p class="credit reveal">Adapted from Dex Horthy / HumanLayer, “No Vibes Allowed.”</p>
+</section>
+<div class="footrule"></div>
+
+<div class="kbd-hint" id="kbdHint"><kbd>↑</kbd> <kbd>↓</kbd> sections · <kbd>←</kbd> <kbd>→</kbd> step the case · <kbd>C</kbd> copy command</div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(s, r){ return (r||document).querySelector(s); };
+  var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- clipboard ---------- */
+  function copy(text){
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(text).catch(function(){ return fallbackCopy(text); });
+    }
+    return Promise.resolve(fallbackCopy(text));
+  }
+  function fallbackCopy(text){
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  /* ---------- reveal on scroll ---------- */
+  var revIO = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add("in"); revIO.unobserve(en.target); } });
+  }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+  $$(".reveal").forEach(function(el, i){ el.style.transitionDelay = Math.min(i*40, 240) + "ms"; revIO.observe(el); });
+
+  /* ---------- progress bar ---------- */
+  var progress = $("#progress");
+  function onScroll(){
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    progress.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + "%";
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  /* ---------- nav rail + section tracking ---------- */
+  var sections = $$("section[data-rail]");
+  var rail = $("#rail");
+  sections.forEach(function(sec, i){
+    var b = document.createElement("button");
+    b.className = "rail-dot";
+    b.title = sec.getAttribute("data-rail");
+    b.setAttribute("aria-label", sec.getAttribute("data-rail"));
+    b.addEventListener("click", function(){ scrollToSection(i); });
+    rail.appendChild(b);
+  });
+  var railDots = $$(".rail-dot");
+  var currentSection = 0;
+  function scrollToSection(i){
+    i = Math.max(0, Math.min(sections.length - 1, i));
+    window.scrollTo({ top: sections[i].offsetTop, behavior: reduceMotion ? "auto" : "smooth" });
+  }
+  var secIO = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){
+      if(en.isIntersecting){
+        var idx = sections.indexOf(en.target);
+        currentSection = idx;
+        railDots.forEach(function(d, di){ d.setAttribute("aria-current", di === idx ? "true" : "false"); });
+      }
+    });
+  }, { threshold: 0.5 });
+  sections.forEach(function(s){ secIO.observe(s); });
+
+  $("#cueBtn").addEventListener("click", function(){ scrollToSection(1); });
+
+  /* ---------- PIPELINE ---------- */
+  var NODES = [
+    { idx:"01", cmd:"/research", job:"Map the territory before touching code.",
+      role:"reads the codebase",
+      desc:"Forks sub-agents to read the relevant code and history, then writes down what is actually true. No fixes yet.",
+      alab:"writes", file:"thoughts/<topic>", pen:".md", literal:"/research <area>" },
+    { idx:"02", cmd:"/create-plan", job:"Turn findings into a step-by-step plan.",
+      role:"reads the research",
+      desc:"Reads the research doc and proposes a concrete, reviewable plan. Phases, files, and an explicit list of what it will not do.",
+      alab:"writes", file:"thoughts/<topic>-plan", pen:".md", literal:"/create-plan <topic>" },
+    { idx:"03", cmd:"/implement", job:"Execute the plan. Ship the code.",
+      role:"reads the plan",
+      desc:"Works the plan top to bottom, commit by commit. The plan is the spec, so the loop stays on rails.",
+      alab:"writes", file:"the code", pen:", commit by commit", literal:"/implement <topic>-plan" },
+    { idx:"04", cmd:"/pr", job:"Open the PR with the plan attached.",
+      role:"reads everything",
+      desc:"Opens the pull request and puts the plan on it, so reviewers read intent first and the diff second.",
+      alab:"attaches", file:"the plan", pen:" to the PR", literal:"/pr" }
+  ];
+  var DOCS = ["<topic>.md", "<topic>-plan.md", "code"];
+
+  var pipe = $("#pipe");
+  NODES.forEach(function(n, i){
+    var btn = document.createElement("button");
+    btn.className = "node";
+    btn.setAttribute("aria-expanded", "false");
+    btn.setAttribute("data-i", i);
+    btn.innerHTML =
+      '<span class="nidx">'+n.idx+'</span>' +
+      '<span class="ncmd">'+n.cmd+'</span>' +
+      '<span class="njob">'+n.job+'</span>' +
+      '<span class="ntag">details <span class="chev"></span></span>';
+    btn.addEventListener("click", function(){ toggleNode(i); });
+    pipe.appendChild(btn);
+
+    if (i < NODES.length - 1){
+      var c = document.createElement("div");
+      c.className = "conn";
+      c.innerHTML = '<span class="track"></span><span class="tok" style="animation-delay:'+(i*0.5)+'s"></span><span class="head"></span><span class="doclabel">'+DOCS[i]+'</span>';
+      pipe.appendChild(c);
+    }
+  });
+
+  var drawer = $("#drawer");
+  var drawerBody = $("#drawerBody");
+  var openNode = -1;
+
+  function toggleNode(i){
+    var nodes = $$(".node");
+    if (openNode === i){
+      openNode = -1;
+      drawer.classList.remove("open");
+      nodes[i].setAttribute("aria-expanded", "false");
+      return;
+    }
+    openNode = i;
+    nodes.forEach(function(nd, ni){ nd.setAttribute("aria-expanded", ni === i ? "true" : "false"); });
+    var n = NODES[i];
+    drawerBody.innerHTML =
+      '<div class="drawer-grid">' +
+        '<div>' +
+          '<p class="role">phase ' + n.idx + ' · ' + n.role + '</p>' +
+          '<h3>' + n.cmd + '</h3>' +
+          '<p>' + n.desc + '</p>' +
+          '<button class="copychip" data-copy="' + n.literal + '">' +
+            '<span class="cmd">' + n.literal + '</span>' +
+            '<span class="ico"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M3.5 10.5h-.5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v.5" stroke="currentColor" stroke-width="1.3"/></svg></span>' +
+            '<span class="copied-txt">copied</span>' +
+          '</button>' +
+        '</div>' +
+        '<div class="artifact">' +
+          '<span class="alab">' + n.alab + '</span>' +
+          '<span class="afile">' + n.file + '<span class="pen">' + n.pen + '</span></span>' +
+        '</div>' +
+      '</div>';
+    drawer.classList.add("open");
+    bindCopy(drawerBody);
+  }
+
+  /* arrow keys move focus across nodes */
+  pipe.addEventListener("keydown", function(e){
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    var nodes = $$(".node");
+    var cur = nodes.indexOf(document.activeElement);
+    if (cur === -1) return;
+    e.preventDefault();
+    var next = e.key === "ArrowRight" ? cur + 1 : cur - 1;
+    if (next >= 0 && next < nodes.length) nodes[next].focus();
+  });
+
+  /* ---------- copy binding (delegated-ish) ---------- */
+  function bindCopy(root){
+    $$("[data-copy]", root).forEach(function(el){
+      if (el.__bound) return; el.__bound = true;
+      el.addEventListener("click", function(){
+        copy(el.getAttribute("data-copy"));
+        el.classList.add("copied");
+        setTimeout(function(){ el.classList.remove("copied"); }, 1400);
+      });
+    });
+  }
+
+  /* ---------- SMART ZONE meter ---------- */
+  var meter = $("#meter"), fill = $("#fill"), handle = $("#handle"), pct = $("#pct");
+  var zsTag = $("#zsTag"), zsBody = $("#zsBody"), zoneStatus = $("#zoneStatus");
+  var ticks = $("#ticks");
+  for (var t = 1; t < 10; t++){ var tk = document.createElement("div"); tk.className = "tick"; tk.style.left = (t*10) + "%"; ticks.appendChild(tk); }
+
+  var value = 28;
+  function lerp(a,b,t){ return a + (b-a)*t; }
+  function setMeter(v){
+    value = Math.max(0, Math.min(100, Math.round(v)));
+    fill.style.width = value + "%";
+    handle.style.left = value + "%";
+    pct.textContent = value + "%";
+    meter.setAttribute("aria-valuenow", value);
+    // hue: green 152 -> red 26 as value rises
+    var ht = value / 100;
+    var hue = lerp(152, 26, ht);
+    var light = lerp(0.78, 0.64, ht);
+    var col = "oklch(" + light.toFixed(3) + " 0.17 " + hue.toFixed(1) + ")";
+    fill.style.background = col;
+    zoneStatus.style.setProperty("--zonecol", col);
+
+    var tag, body;
+    if (value < 40){
+      tag = "smart zone";
+      body = "<b>An agent only knows what's in its context window.</b> Right now there is room for signal. It sees the plan and the few files that matter.";
+    } else if (value < 70){
+      tag = "filling up";
+      body = "<b>An agent only knows what's in its context window.</b> The signal is getting buried. Stray files, dead ends, and old output start to crowd out what matters.";
+    } else {
+      tag = "dumb zone";
+      body = "<b>Fill it with junk and even a capable model makes careless mistakes.</b> Buried in noise, it forgets the goal, repeats itself, and ships sloppy work.";
+    }
+    zsTag.textContent = tag;
+    zsBody.innerHTML = body;
+  }
+  setMeter(value);
+
+  var dragging = false;
+  function pointerToValue(clientX){
+    var r = meter.getBoundingClientRect();
+    return ((clientX - r.left) / r.width) * 100;
+  }
+  meter.addEventListener("pointerdown", function(e){
+    dragging = true; meter.setPointerCapture(e.pointerId);
+    setMeter(pointerToValue(e.clientX)); meter.focus();
+  });
+  meter.addEventListener("pointermove", function(e){ if (dragging) setMeter(pointerToValue(e.clientX)); });
+  meter.addEventListener("pointerup", function(e){ dragging = false; try{ meter.releasePointerCapture(e.pointerId); }catch(_){} });
+  meter.addEventListener("keydown", function(e){
+    var step = e.shiftKey ? 10 : 2;
+    if (e.key === "ArrowRight" || e.key === "ArrowUp"){ e.preventDefault(); setMeter(value + step); }
+    else if (e.key === "ArrowLeft" || e.key === "ArrowDown"){ e.preventDefault(); setMeter(value - step); }
+    else if (e.key === "Home"){ e.preventDefault(); setMeter(0); }
+    else if (e.key === "End"){ e.preventDefault(); setMeter(100); }
+  });
+
+  /* ---------- UNLOCK: diff vs plan ---------- */
+  var diffInner = $("#diffInner");
+  var DIFF_SNIPPETS = [
+    "const throttle = createThrottle({ key, window: 60_000 });",
+    "if (!cache.has(bucketKey)) cache.set(bucketKey, []);",
+    "const sent = cache.get(bucketKey).filter(t => now - t < windowMs);",
+    "logger.debug('email.throttle.check', { key, count: sent.length });",
+    "await redis.zadd(`throttle:${tenantId}`, now, jobId);",
+    "const recent = await redis.zrangebyscore(`throttle:${tenantId}`, min, now);",
+    "if (recent.length >= limit) { metrics.inc('email.throttled'); return SKIP; }",
+    "queue.enqueue({ type: 'digest', tenantId, attempt: attempt + 1 });",
+    "const tpl = templates.resolve(tenant.locale) ?? templates.default;",
+    "headers['X-Tenant'] = String(tenantId);",
+    "span.setAttribute('email.batch_size', batch.length);",
+    "for (const row of rows) { acc[row.bucket] = (acc[row.bucket] ?? 0) + 1; }",
+    "return { ok: true, sent: dispatched, skipped: throttled };",
+    "} catch (err) { logger.error('email.dispatch.failed', { err }); throw err; }",
+    "const conn = await pool.connect(); try { await conn.query('BEGIN'); }",
+    "const since = subHours(new Date(), lookbackHours);",
+    "assert(typeof tenantId === 'number', 'tenantId must be numeric');"
+  ];
+  var diffHtml = "";
+  for (var d = 1; d <= 520; d++){
+    var src = DIFF_SNIPPETS[(d * 7) % DIFF_SNIPPETS.length];
+    diffHtml += '<div class="codeline"><span class="ln">'+d+'</span><span class="sign">+</span><span class="src">'+escapeHtml(src)+'</span></div>';
+  }
+  diffInner.innerHTML = diffHtml;
+
+  function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  var PLAN = [
+    ["h","# Plan: throttle OppSource digest emails"],
+    ["dim",""],
+    ["dim","Source research: thoughts/email-throttle.md"],
+    ["dim",""],
+    ["h","## Problem"],
+    ["",'The digest job re-sends when a retry races the cache.'],
+    ["",'Root cause confirmed against prod: the cache key is set'],
+    ["",'by only some handlers, not all of them.'],
+    ["dim",""],
+    ["h","## Approach"],
+    ["",'Move the throttle to a single choke point so every path'],
+    ["",'shares one key. Two phases, shippable independently.'],
+    ["dim",""],
+    ["acc","## Phase 1  ·  centralize the key"],
+    ["","1. Add throttleKey(tenantId) used by all four handlers."],
+    ["","2. Replace ad-hoc keys in digest, retry, manual, webhook."],
+    ["ok","   verify: one key per tenant in redis under load test"],
+    ["dim",""],
+    ["acc","## Phase 2  ·  guard at the source"],
+    ["","3. Wrap dispatch() with the shared throttle check."],
+    ["","4. Emit email.throttled metric on every skip."],
+    ["ok","   verify: zero duplicate sends in 24h replay"],
+    ["dim",""],
+    ["no","## What we are NOT doing"],
+    ["no","- NOT raising the rate limit. That hides the bug."],
+    ["no","- NOT adding a dedupe table. New state to keep in sync."],
+    ["no","- NOT touching the email template path. Out of scope."],
+    ["dim",""],
+    ["h","## Risk"],
+    ["",'Low. Behind a flag, reversible by config.']
+  ];
+  var planInner = $("#planInner");
+  var planHtml = "";
+  PLAN.forEach(function(row, i){
+    planHtml += '<div class="codeline"><span class="ln">'+(i+1)+'</span><span class="src '+row[0]+'">'+escapeHtml(row[1])+'</span></div>';
+  });
+  planInner.innerHTML = planHtml;
+
+  var tDiff = $("#tDiff"), tPlan = $("#tPlan");
+  var paneDiff = $("#paneDiff"), panePlan = $("#panePlan");
+  var stageName = $("#stageName"), stageCount = $("#stageCount");
+  function showMode(mode){
+    var isDiff = mode === "diff";
+    tDiff.setAttribute("aria-pressed", isDiff ? "true" : "false");
+    tPlan.setAttribute("aria-pressed", isDiff ? "false" : "true");
+    paneDiff.classList.toggle("show", isDiff);
+    panePlan.classList.toggle("show", !isDiff);
+    stageName.textContent = isDiff ? "feature/email-throttle.diff" : "thoughts/email-throttle-plan.md";
+    stageCount.innerHTML = isDiff ? "+2,000  −0" : "31 lines · reviewable";
+    stageCount.className = "counter " + (isDiff ? "add" : "plan");
+  }
+  tDiff.addEventListener("click", function(){ showMode("diff"); });
+  tPlan.addEventListener("click", function(){ showMode("plan"); });
+
+  /* ---------- PROOF stepper ---------- */
+  var STEPS = [
+    { role:"The problem", n:"01",
+      h:"An email job kept timing out. For eleven months.",
+      html:
+        '<p>The OppSource digest job hit a Postgres <b>QueryCanceled</b> timeout. It had been recurring for <b>11 months</b>, and it survived a prior index fix that everyone assumed had closed it.</p>' +
+        '<div class="statrow">' +
+          '<div class="stat"><div class="v bad">11 mo</div><div class="k">open and recurring</div></div>' +
+          '<div class="stat"><div class="v bad">1</div><div class="k">prior fix that did not hold</div></div>' +
+        '</div>' },
+    { role:"Research", n:"02",
+      h:"It falsified its own first guess against prod.",
+      html:
+        '<p>The loop formed a hypothesis, tested it against production, and <span class="kill">falsified it.</span> Instead of shipping the convenient answer, it kept going.</p>' +
+        '<p>A prod <b>EXPLAIN</b> found the real cause: a cross-column mis-estimate sent the planner down a full scan.</p>' +
+        '<div class="statrow">' +
+          '<div class="stat"><div class="v">27.8M</div><div class="k">rows full-scanned</div></div>' +
+          '<div class="stat"><div class="v">27.85s</div><div class="k">on one query</div></div>' +
+        '</div>' },
+    { role:"Plan", n:"03",
+      h:"A two-phase fix, and three fixes it refused to make.",
+      html:
+        '<p>The plan was two phases, guarded at the source. The part that earns trust is the <b>what we are NOT doing</b> list, where it rejected three tempting wrong fixes with reasons.</p>' +
+        '<div class="notlist">' +
+          '<div class="notitem"><span class="x">NOT</span><span class="t"><b>Bump the statement timeout.</b> Hides the scan, ships the latency.</span></div>' +
+          '<div class="notitem"><span class="x">NOT</span><span class="t"><b>Add another single-column index.</b> The last one did not hold.</span></div>' +
+          '<div class="notitem"><span class="x">NOT</span><span class="t"><b>Rewrite the job async.</b> New failure modes, same root cause.</span></div>' +
+        '</div>' },
+    { role:"Implement", n:"04",
+      h:"Shipped as PR #14385, guarding the query at its source.",
+      html:
+        '<p>The fix shipped as <b>PR #14385</b>. It guards the query where the bad estimate started, so the planner stops choosing the full scan.</p>' +
+        '<div class="statrow">' +
+          '<div class="stat"><div class="v">#14385</div><div class="k">merged this week</div></div>' +
+          '<div class="stat"><div class="v">1</div><div class="k">loop, end to end</div></div>' +
+        '</div>' }
+  ];
+  var caseBody = $("#caseBody");
+  var caseSteps = $("#caseSteps");
+  var casePos = $("#casePos");
+  var prevBtn = $("#prevStep"), nextBtn = $("#nextStep");
+  var step = 0;
+  var TOTAL = STEPS.length;
+
+  STEPS.forEach(function(s){
+    var d = document.createElement("span");
+    d.className = "stepdot"; d.innerHTML = '<span class="b"></span>';
+    caseSteps.appendChild(d);
+  });
+  // build step nodes
+  STEPS.forEach(function(s, i){
+    var el = document.createElement("div");
+    el.className = "step";
+    el.innerHTML = '<p class="srole"><span class="sn">'+s.n+'</span>'+s.role+'</p><h3>'+s.h+'</h3>'+s.html;
+    caseBody.appendChild(el);
+  });
+  // punchline node
+  var punch = document.createElement("div");
+  punch.className = "punch";
+  punch.innerHTML = '<p class="pk">the punchline</p><p class="pbig">Eleven months open. <span class="a">Diagnosed and fixed in one loop,</span> this week.</p>';
+  caseBody.appendChild(punch);
+
+  var stepEls = $$(".step", caseBody);
+  var stepDots = $$(".stepdot", caseSteps);
+
+  function renderStep(){
+    var isPunch = step >= TOTAL;
+    stepEls.forEach(function(el, i){ el.classList.toggle("active", !isPunch && i === step); });
+    punch.classList.toggle("active", isPunch);
+    stepDots.forEach(function(dt, i){
+      dt.setAttribute("data-on", (!isPunch && i === step) ? "true" : "false");
+      dt.setAttribute("data-done", (i < step) ? "true" : "false");
+    });
+    if (isPunch){
+      casePos.textContent = "Resolved · GOV-4078";
+      nextBtn.textContent = "Start over";
+      nextBtn.disabled = false;
+    } else {
+      casePos.textContent = "Step " + (step + 1) + " / " + TOTAL;
+      nextBtn.textContent = (step === TOTAL - 1) ? "See the result →" : "Next →";
+      nextBtn.disabled = false;
+    }
+    prevBtn.disabled = step === 0;
+  }
+  function goStep(n){
+    if (n > TOTAL) { step = 0; } else { step = Math.max(0, n); }
+    renderStep();
+  }
+  nextBtn.addEventListener("click", function(){ goStep(step + 1); });
+  prevBtn.addEventListener("click", function(){ goStep(step - 1); });
+  renderStep();
+
+  /* ---------- RUN IT chips ---------- */
+  var RUN = [
+    { step:"Start here", cmd:"/research" },
+    { step:"Then", cmd:"/create-plan" },
+    { step:"Then ship", cmd:"/implement" }
+  ];
+  var runChips = $("#runChips");
+  RUN.forEach(function(r){
+    var b = document.createElement("button");
+    b.className = "bigchip"; b.setAttribute("data-copy", r.cmd);
+    b.innerHTML =
+      '<span><span class="bc-step">'+r.step+'</span><span class="bc-cmd">'+r.cmd+'</span></span>' +
+      '<span class="bc-ico"><svg width="20" height="20" viewBox="0 0 16 16" fill="none"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M3.5 10.5h-.5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v.5" stroke="currentColor" stroke-width="1.3"/></svg><span class="bc-copied">copied</span></span>';
+    runChips.appendChild(b);
+  });
+  bindCopy(runChips);
+
+  /* ---------- global keyboard ---------- */
+  document.addEventListener("keydown", function(e){
+    if (e.target && (e.target.id === "meter")) return; // meter handles its own arrows
+    var tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+    if (e.key === "ArrowDown" || e.key === "PageDown"){
+      if (e.key === "PageDown") { e.preventDefault(); scrollToSection(currentSection + 1); }
+    } else if (e.key === "ArrowUp" || e.key === "PageUp"){
+      if (e.key === "PageUp") { e.preventDefault(); scrollToSection(currentSection - 1); }
+    } else if (e.key === "j"){ scrollToSection(currentSection + 1); }
+    else if (e.key === "k"){ scrollToSection(currentSection - 1); }
+    else if (e.key === "ArrowRight"){
+      if (currentSection === sections.indexOf($("#proof"))) { e.preventDefault(); goStep(step + 1); }
+    } else if (e.key === "ArrowLeft"){
+      if (currentSection === sections.indexOf($("#proof"))) { e.preventDefault(); goStep(step - 1); }
+    } else if (e.key === "Enter"){
+      if (currentSection === 0) { scrollToSection(1); }
+    }
+  });
+
+  /* fade the kbd hint after a while */
+  setTimeout(function(){ var h = $("#kbdHint"); if(h) h.style.opacity = "0"; }, 9000);
+})();
+</script>
+</body>
+</html>
